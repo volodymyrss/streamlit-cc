@@ -1,0 +1,30 @@
+.highlight {
+    border-radius: 0.2rem;
+    color: white;
+    padding: 0.2rem;
+    margin-bottom: 0.5rem;
+  }
+  .bold {
+    padding-left: 1rem;
+    font-weight: 700;
+  }
+  .lightred {
+    background-color: lightcoral;
+  }
+  .red {
+    background-color: rgb(146, 106, 92);
+  }
+
+  .lightblue {
+    background-color: lightblue;
+  }
+  .blue {
+    background-color: rgb(100, 100, 201);
+  }
+  .lightgreen {
+    background-color: lightgreen;
+  }
+  .green {
+    background-color: darkgreen;
+  }
+  
