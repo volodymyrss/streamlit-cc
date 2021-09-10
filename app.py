@@ -65,7 +65,7 @@ local_css("style.css")
 
 # from astropy.time import Time
 
-@st.cache(ttl=300, max_entries=100, persist=True)   #-- Magic command to cache data
+@st.cache(ttl=10, max_entries=100, persist=False)   #-- Magic command to cache data
 def load_osa_versions():
     try:
         import odakb
@@ -75,26 +75,19 @@ def load_osa_versions():
             tojdict=True,
             limit=3000)        
 
-        osa_features = odakb.sparql.select(
-            f'?smth oda:has_feature ?feature',
-            tojdict=True,
-            limit=3000)    
-
-        evaluation_reports = odakb.sparql.select(
-            f'?smth oda:evaluation_report ?report',
-            tojdict=True,
-            limit=3000)    
-
-
+        # osa_features = odakb.sparql.select(
+        #     f'?smth oda:has_feature ?feature',
+        #     tojdict=True,
+        #     limit=3000)    
         #print("D:", D)
 
-        return D, osa_features, evaluation_reports
+        return D
                 #jq -cr '.[] | .["http://odahub.io/ontology/paper#grb_isot"][0]["@value"] + "/" + .["http://odahub.io/ontology/paper#mentions_named_grb"][0]["@value"]' | \
                 #sort -r | head -n${nrecent:-20}
     except Exception as e:
         raise RuntimeError("PROBLEM listing OSA versions:", e)
 
-D, osa_features, evaluation_reports = load_osa_versions()
+D = load_osa_versions()
 
 colors = ["green",
     "red",
@@ -107,7 +100,7 @@ colors = ["green",
 feature_colors = {}
 
 for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
-    cols = st.columns(4)
+    cols = st.columns([2,2,3,4])
     #cols[0].write(osa['@id'])
     cols[0].write(f"""
     <div>
@@ -179,9 +172,18 @@ for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
         #     color = colors.pop(0)
         #     colors.append(color)
         #     feature_colors[k] = color
-        cols[3].write(f"{k}")
+        cols[3].write(f"**evaluation**: {k}")
 
-        # T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
+    for k in sorted(osa.get('oda:planned_action', [])):
+        # if k in feature_colors:
+        #     color = feature_colors[k]
+        # else:
+        #     color = colors.pop(0)
+        #     colors.append(color)
+        #     feature_colors[k] = color
+        cols[3].write(f"**planned action**: {k}")
+
+    # T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
         # if len(T) > 150:
         #     cols[1].write(T, unsafe_allow_html=True)
         #     T = ""
