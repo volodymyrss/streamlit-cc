@@ -80,15 +80,21 @@ def load_osa_versions():
             tojdict=True,
             limit=3000)    
 
+        evaluation_reports = odakb.sparql.select(
+            f'?smth oda:evaluation_report ?report',
+            tojdict=True,
+            limit=3000)    
+
+
         #print("D:", D)
 
-        return D, osa_features
+        return D, osa_features, evaluation_reports
                 #jq -cr '.[] | .["http://odahub.io/ontology/paper#grb_isot"][0]["@value"] + "/" + .["http://odahub.io/ontology/paper#mentions_named_grb"][0]["@value"]' | \
                 #sort -r | head -n${nrecent:-20}
     except Exception as e:
         raise RuntimeError("PROBLEM listing OSA versions:", e)
 
-D, osa_features = load_osa_versions()
+D, osa_features, evaluation_reports = load_osa_versions()
 
 colors = ["green",
     "red",
@@ -101,9 +107,13 @@ colors = ["green",
 feature_colors = {}
 
 for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
-    cols = st.columns(3)
+    cols = st.columns(4)
     #cols[0].write(osa['@id'])
-    cols[0].write("OSA11.1-" + osa['rdfs:label'][0])
+    cols[0].write(f"""
+    <div>
+        <span class="bold">OSA11.0-{osa['rdfs:label'][0]}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     T = ""
          
@@ -116,10 +126,12 @@ for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
             feature_colors[k] = color
 
         T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
-        if len(T) > 150:
+        if len(T) > 100:
             cols[1].write(T, unsafe_allow_html=True)
             T = ""
         #T += f'<div><span class="highlight  {color}">{k}</span></div>&nbsp;'
+
+    
     
     cols[1].write(T, unsafe_allow_html=True)
         
@@ -157,7 +169,22 @@ for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
             cols[2].pyplot(fig)
     except KeyError:
         pass
+    
+    #st.write(osa)
 
+    for k in sorted(osa.get('oda:evaluation_report', [])):
+        # if k in feature_colors:
+        #     color = feature_colors[k]
+        # else:
+        #     color = colors.pop(0)
+        #     colors.append(color)
+        #     feature_colors[k] = color
+        cols[3].write(f"{k}")
+
+        # T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
+        # if len(T) > 150:
+        #     cols[1].write(T, unsafe_allow_html=True)
+        #     T = ""
 
     st.write("***")
     

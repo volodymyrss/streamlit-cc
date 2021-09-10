@@ -1,5 +1,7 @@
 IMAGE=odahub/streamlit-cc:$(shell git describe --tags --always)
 
+default: deploy
+
 build: 
 	docker build . -t $(IMAGE)
 
