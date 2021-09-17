@@ -1,9 +1,11 @@
+from base64 import b64decode
 import json
 from astropy.utils.misc import indent
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import odakb.datalake
 
 import time
 
@@ -66,6 +68,49 @@ local_css("style.css")
 # from astropy.time import Time
 
 @st.cache(ttl=10, max_entries=100, persist=False)   #-- Magic command to cache data
+def load_cc_bucket(bucket):
+    try:
+        import odakb
+        D = odakb.sparql.select(
+            f'{bucket} oda:bucket ?bucket',
+            #'?a ?c ?d', 
+            tojdict=True,
+            limit=3000)        
+
+        bucket_name = D[bucket]['oda:bucket'][0]
+        
+        D = odakb.datalake.restore(bucket_name)
+
+        return D
+                #jq -cr '.[] | .["http://odahub.io/ontology/paper#grb_isot"][0]["@value"] + "/" + .["http://odahub.io/ontology/paper#mentions_named_grb"][0]["@value"]' | \
+                #sort -r | head -n${nrecent:-20}
+    except Exception as e:
+        raise RuntimeError("PROBLEM listing CC for OSA version:", e)
+
+@st.cache(ttl=10, max_entries=100, persist=False)   #-- Magic command to cache data
+def load_cc_by_osa(osa_version):
+    try:
+        import odakb
+        D = odakb.sparql.select(
+            f'?a oda:arg_osa_version "{osa_version}"; ?c ?d',
+            '?a ?c ?d', 
+            tojdict=True,
+            limit=3000)        
+
+        # osa_features = odakb.sparql.select(
+        #     f'?smth oda:has_feature ?feature',
+        #     tojdict=True,
+        #     limit=3000)    
+        #print("D:", D)
+
+        return D
+                #jq -cr '.[] | .["http://odahub.io/ontology/paper#grb_isot"][0]["@value"] + "/" + .["http://odahub.io/ontology/paper#mentions_named_grb"][0]["@value"]' | \
+                #sort -r | head -n${nrecent:-20}
+    except Exception as e:
+        raise RuntimeError("PROBLEM listing CC for OSA version:", e)
+
+
+@st.cache(ttl=10, max_entries=100, persist=False)   #-- Magic command to cache data
 def load_osa_versions():
     try:
         import odakb
@@ -87,109 +132,165 @@ def load_osa_versions():
     except Exception as e:
         raise RuntimeError("PROBLEM listing OSA versions:", e)
 
-D = load_osa_versions()
 
-colors = ["green",
-    "red",
-    "lightred",
-    "blue",
-    "lightblue",
-    "lightgreen",
-    "green"]
 
-feature_colors = {}
+#url_osa_version = st.experimental_get_query_params().get('osa_version', [])
+url_cc_buckets = st.experimental_get_query_params().get('cc_bucket', [])
 
-for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
-    cols = st.columns([2,2,3,4])
-    #cols[0].write(osa['@id'])
-    cols[0].write(f"""
-    <div>
-        <span class="bold">OSA11.0-{osa['rdfs:label'][0]}</span>
-    </div>
-    """, unsafe_allow_html=True)
+if url_cc_buckets != []:
+    for url_cc_bucket in url_cc_buckets:
+#        st.markdown(url_cc_bucket)
+        cols = st.columns([1,3])
 
-    T = ""
-         
-    for k, v in sorted(osa.get('oda:has_osa_feature', {}).items()):
-        if k in feature_colors:
-            color = feature_colors[k]
-        else:
-            color = colors.pop(0)
-            colors.append(color)
-            feature_colors[k] = color
+        bucket_data = load_cc_bucket(url_cc_bucket)
 
-        T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
-        if len(T) > 100:
-            cols[1].write(T, unsafe_allow_html=True)
-            T = ""
-        #T += f'<div><span class="highlight  {color}">{k}</span></div>&nbsp;'
+        status = bucket_data.get('summary').get('status', 'unset')
 
-    
-    
-    cols[1].write(T, unsafe_allow_html=True)
+        color = {
+            'OK': 'green',
+            'NOK': 'red',
+        }.get(status, 'yellow')
+
+        cols[0].write(f"""
+        <div>
+            <span class="highlight {color}">{status}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+        for k, v in bucket_data.items():
+            if k.endswith("_html_content"):
+                import base64
+                import streamlit.components.v1 as components
+
+                # >>> import plotly.express as px
+                # >>> fig = px.box(range(10))
+                # >>> fig.write_html('test.html')
+
+                st.header("test html import")
+
+                source_code = base64.b64decode(v).decode()
+
+                with cols[1]:
+                    components.html(source_code, height = 1000, scrolling=True)
+#                st.write(f"content: {k} {len(v)}")
+#                st.write("<frame>" + base64.b64decode(v).decode() + "</frame>", unsafe_allow_html=True)
+                #st.write(f'<img src="data:image/gif;base64,{v}" alt="cat gif">', unsafe_allow_html=True)
+                #base64.b64decode(v)
+            elif k.endswith("_content"):
+                pass
+            else:
+                import yaml, io
+                f = io.StringIO()
+                yaml.dump(v, f)
+
+                with cols[0]:
+                    st.write(f"{k}:" + f.getvalue().replace("\n", "<br>").replace(" ", "&nbsp;"), unsafe_allow_html=True)
+
+else:    
+    D = load_osa_versions()
+
+    colors = ["green",
+        "red",
+        "lightred",
+        "blue",
+        "lightblue",
+        "lightgreen",
+        "green"]
+
+    feature_colors = {}
+
+    for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
+        osa_version = 'OSA11.0-' + osa['rdfs:label'][0]
+
+        cols = st.columns([2,2,3,4])
+        #cols[0].write(osa['@id'])
+        cols[0].write(f"""
+        <div>
+            <span class="bold">{osa_version}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        T = ""
+            
+        for k, v in sorted(osa.get('oda:has_osa_feature', {}).items()):
+            if k in feature_colors:
+                color = feature_colors[k]
+            else:
+                color = colors.pop(0)
+                colors.append(color)
+                feature_colors[k] = color
+
+            T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
+            if len(T) > 100:
+                cols[1].write(T, unsafe_allow_html=True)
+                T = ""
+            #T += f'<div><span class="highlight  {color}">{k}</span></div>&nbsp;'
+
         
-    try:
-        validity_start_isot = osa['oda:validity_start_isot'][0]
-        validity_stop_isot = osa['oda:validity_stop_isot'][0]
+        
+        cols[1].write(T, unsafe_allow_html=True)
+            
+        try:
+            validity_start_isot = osa['oda:validity_start_isot'][0]
+            validity_stop_isot = osa['oda:validity_stop_isot'][0]
 
-        cols[2].write(f"""
-            {validity_start_isot} - {validity_stop_isot}
-        """)
+            cols[2].write(f"""
+                {validity_start_isot} - {validity_stop_isot}
+            """)
 
-        with _lock:
-            from matplotlib import pylab as plt
-            import numpy as np
-            from astropy.coordinates import SkyCoord
+            with _lock:
+                from matplotlib import pylab as plt
+                import numpy as np
+                from astropy.coordinates import SkyCoord
 
-            fig = plt.figure(figsize=(15,1.5))
+                fig = plt.figure(figsize=(15,1.5))
 
-            plt.axvspan(
-                Time(validity_start_isot).byear,
-                Time(validity_stop_isot).byear,
-                color="green",
-                alpha=0.5
-            )
-            plt.xlim([2002, 2023])
-            fig.gca().spines['top'].set_visible(False)
-            fig.gca().spines['left'].set_visible(False)
-            fig.gca().spines['right'].set_visible(False)
-            fig.gca().get_yaxis().set_ticks([])
-            plt.axvline(Time("2002-10-17").byear, lw=5, c='y')
-            plt.axvline(Time("2022-12-31").byear, lw=5, c='r')
-            plt.axvline(Time.now().byear, lw=3, c='r', ls=":")
+                plt.axvspan(
+                    Time(validity_start_isot).byear,
+                    Time(validity_stop_isot).byear,
+                    color="green",
+                    alpha=0.5
+                )
+                plt.xlim([2002, 2023])
+                fig.gca().spines['top'].set_visible(False)
+                fig.gca().spines['left'].set_visible(False)
+                fig.gca().spines['right'].set_visible(False)
+                fig.gca().get_yaxis().set_ticks([])
+                plt.axvline(Time("2002-10-17").byear, lw=5, c='y')
+                plt.axvline(Time("2022-12-31").byear, lw=5, c='r')
+                plt.axvline(Time.now().byear, lw=3, c='r', ls=":")
 
-                                
-            cols[2].pyplot(fig)
-    except KeyError:
-        pass
-    
-    #st.write(osa)
+                                    
+                cols[2].pyplot(fig)
+        except KeyError:
+            pass
+        
+        #st.write(osa)
 
-    for k in sorted(osa.get('oda:evaluation_report', [])):
-        # if k in feature_colors:
-        #     color = feature_colors[k]
-        # else:
-        #     color = colors.pop(0)
-        #     colors.append(color)
-        #     feature_colors[k] = color
-        cols[3].write(f"**evaluation**: {k}")
+        for attribute in ['oda:evaluation_report', 'oda:planned_action']:
+            for k in sorted(osa.get(attribute, [])):
+                # if k in feature_colors:
+                #     color = feature_colors[k]
+                # else:
+                #     color = colors.pop(0)
+                #     colors.append(color)
+                #     feature_colors[k] = color
+                cols[3].write(f'**{attribute.replace("oda:", "").replace("_", " ")}**: {k}')
 
-    for k in sorted(osa.get('oda:planned_action', [])):
-        # if k in feature_colors:
-        #     color = feature_colors[k]
-        # else:
-        #     color = colors.pop(0)
-        #     colors.append(color)
-        #     feature_colors[k] = color
-        cols[3].write(f"**planned action**: {k}")
+        #st.markdown(load_cc_by_osa(osa))
 
-    # T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
-        # if len(T) > 150:
-        #     cols[1].write(T, unsafe_allow_html=True)
-        #     T = ""
-
-    st.write("***")
-    
+        cc_results = load_cc_by_osa(osa_version)
+        with st.expander(f"cross-calibration workflows: {len(cc_results)}"):
+            for cc, d in cc_results.items():
+                cols = st.columns([1,2])
+                cols[0].markdown(f'<a href="?cc_bucket={cc}">{cc}</a>', unsafe_allow_html=True)
+                for k, v in d.items():
+                    if k.startswith("oda:arg_"):
+                        cols[1].markdown(f'{k}: {v}')
+            
+        st.write("***")
+        
         
     #cols[3].write(osa)
 
