@@ -60,6 +60,17 @@ spec:
                 secretKeyRef:
                   name: cdci-secret
                   key: cdci-secret.txt
+            - name: MINIO_URL
+              value: minio.obsuks1.unige.ch
+            - name: MINIO_USER
+              value: savchenk
+            - name: MINIO_SECURE
+              value: "yes"
+            - name: MINIO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio
+                  key: minio-secret
           volumeMounts:          
 
       {{- with .Values.nodeSelector }}

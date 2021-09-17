@@ -103,7 +103,7 @@ def load_cc_by_osa(osa_version):
         #     limit=3000)    
         #print("D:", D)
 
-        return D
+        return {k:v for k, v in D.items() if 'cc-isgri-oda' not in k}
                 #jq -cr '.[] | .["http://odahub.io/ontology/paper#grb_isot"][0]["@value"] + "/" + .["http://odahub.io/ontology/paper#mentions_named_grb"][0]["@value"]' | \
                 #sort -r | head -n${nrecent:-20}
     except Exception as e:
