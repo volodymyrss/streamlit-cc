@@ -67,6 +67,16 @@ local_css("style.css")
 
 # from astropy.time import Time
 
+
+with st.expander("What is this?"):
+    st.markdown("""
+    * Workflows are generally stored in gitlab, such as https://gitlab.astro.unige.ch/integral/cc-workflows/cc-1a0535/.
+    * Gitlab CI/CD runs the default parameters (default OSA and subcase -- as set in the notebook), as so: https://gitlab.astro.unige.ch/integral/cc-workflows/cc-1a0535/-/jobs/10366
+    * Below, there results of all runs, some of them are run in CI, some in REANA, or even at own laptop    
+    """)
+
+st.markdown("***")
+
 @st.cache(ttl=10, max_entries=100, persist=False)   #-- Magic command to cache data
 def load_cc_bucket(bucket):
     try:
@@ -221,10 +231,12 @@ else:
                 colors.append(color)
                 feature_colors[k] = color
 
-            T += f'<span class="highlight  {color}">{k}</span>&nbsp;'
-            if len(T) > 100:
+            _T = f'<span class="highlight  {color}">{k}</span>&nbsp;'
+            if len(T + _T) > 120:
                 cols[1].write(T, unsafe_allow_html=True)
-                T = ""
+                T = _T
+            else:
+                T += _T
             #T += f'<div><span class="highlight  {color}">{k}</span></div>&nbsp;'
 
         
