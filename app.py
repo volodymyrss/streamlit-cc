@@ -211,7 +211,10 @@ else:
     feature_colors = {}
 
     for osa in reversed(sorted(D.values(), key=lambda x:x['@id'])):
-        osa_version = 'OSA11.0-' + osa['rdfs:label'][0]
+        if osa['rdfs:label'][0] == "default-isdc":
+            osa_version = "OSA11.0"
+        else:
+            osa_version = 'OSA11.0-' + osa['rdfs:label'][0]
 
         cols = st.columns([2,2,3,4])
         #cols[0].write(osa['@id'])
